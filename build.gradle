@@ -1,0 +1,84 @@
+plugins {
+    id 'application'
+    id 'idea'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.40'
+    id 'com.palantir.docker' version '0.22.1'
+    id 'com.palantir.docker-compose' version '0.22.1'
+    id 'com.palantir.git-version' version '0.11.0'
+    id 'com.palantir.docker-run' version '0.22.1'
+    id "com.github.johnrengelman.shadow" version "4.0.4"
+}
+
+group 'com.github.mangatmodi'
+version '1.0'
+
+mainClassName = "com.github.mangatmodi.kotlintemplate.Main"
+
+def gitDetails = versionDetails()
+def projectTag = "${gitDetails.gitHash}"
+def jarName = "${project.name}-${version}-all.jar"
+def baseDockerName = "mangatmodi/${project.name}"
+def baseDockerFile = file("${project.projectDir}/docker/Dockerfile")
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    functionalTestCompile.extendsFrom compile
+    functionalTestCompile.extendsFrom testCompile
+    functionalTestRuntime.extendsFrom runtime
+    functionalTestRuntime.extendsFrom testRuntime
+}
+
+sourceSets {
+    main.kotlin.srcDirs += 'src/main/kotlin'
+    main.java.srcDirs += 'src/main/java'
+    functionalTest {
+        java.srcDirs  files('src/functional-test/java','src/functional-test/kotlin')
+        resources.srcDirs  files('src/functional-test/resources')
+
+        compileClasspath += main.output + test.output + configurations.functionalTestCompile
+        runtimeClasspath += output + compileClasspath + configurations.functionalTestRuntime
+    }
+}
+idea {
+    module {
+        testSourceDirs += sourceSets.functionalTest.allSource.srcDirs
+        testSourceDirs += sourceSets.functionalTest.resources.srcDirs
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        allWarningsAsErrors = true
+        jvmTarget = "11"
+    }
+}
+
+docker {
+    name "${baseDockerName}:${projectTag}"
+    buildArgs([JAR_NAME: "${jarName}"])
+    files project.jar.outputs, baseDockerFile.getParentFile().listFiles(), buildDir.listFiles()
+    dockerfile baseDockerFile
+}
+
+dockerRun {
+    name project.name
+    image "${baseDockerName}:${projectTag}"
+    ports '8080:8080'
+    daemonize true
+}
+
+// Task Dependencies
+tasks.docker.dependsOn(shadowJar)
+tasks.dockerRun.dependsOn(tasks.docker)
+shadowJar.dependsOn(compileKotlin, compileJava)
+
+// Dependencies
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    compile("io.ktor:ktor-server-netty:1.2.2")
+    compile("ch.qos.logback:logback-classic:1.2.3")
+    testCompile("junit:junit:4.12")
+}
