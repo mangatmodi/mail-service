@@ -3,63 +3,52 @@ plugins {
     id 'idea'
     id 'org.jetbrains.kotlin.jvm' version '1.3.40'
     id 'com.palantir.docker' version '0.22.1'
-    id 'com.palantir.docker-compose' version '0.22.1'
     id 'com.palantir.git-version' version '0.11.0'
     id 'com.palantir.docker-run' version '0.22.1'
-    id "com.github.johnrengelman.shadow" version "4.0.4"
+    id 'com.avast.gradle.docker-compose' version '0.6.12'
+    id 'com.github.johnrengelman.shadow' version '4.0.4'
 }
 
 group 'com.github.mangatmodi'
 version '1.0'
-
-mainClassName = "com.github.mangatmodi.kotlintemplate.Main"
+mainClassName = "com.github.mangatmodi.mail.Main"
 
 def gitDetails = versionDetails()
 def projectTag = "${gitDetails.gitHash}"
-def jarName = "${project.name}-${version}-all.jar"
+def jarName = "${project.name}-${version}.jar"
 def baseDockerName = "mangatmodi/${project.name}"
-def baseDockerFile = file("${project.projectDir}/docker/Dockerfile")
+def baseDockerFile = file("${project.projectDir}/docker/app/Dockerfile")
+def HOST_ADDRESS = getLocalIPv4()
 
 repositories {
     mavenCentral()
-}
-
-configurations {
-    functionalTestCompile.extendsFrom compile
-    functionalTestCompile.extendsFrom testCompile
-    functionalTestRuntime.extendsFrom runtime
-    functionalTestRuntime.extendsFrom testRuntime
-}
-
-sourceSets {
-    main.kotlin.srcDirs += 'src/main/kotlin'
-    main.java.srcDirs += 'src/main/java'
-    functionalTest {
-        java.srcDirs  files('src/functional-test/java','src/functional-test/kotlin')
-        resources.srcDirs  files('src/functional-test/resources')
-
-        compileClasspath += main.output + test.output + configurations.functionalTestCompile
-        runtimeClasspath += output + compileClasspath + configurations.functionalTestRuntime
-    }
-}
-idea {
-    module {
-        testSourceDirs += sourceSets.functionalTest.allSource.srcDirs
-        testSourceDirs += sourceSets.functionalTest.resources.srcDirs
-    }
+    jcenter()
 }
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
     kotlinOptions {
         allWarningsAsErrors = true
-        jvmTarget = "11"
+        jvmTarget = "1.8"
     }
+}
+
+task copyTestResources(type: Copy) {
+    from "${projectDir}/src/test/resources"
+    into "${buildDir}/classes/test"
+}
+
+processTestResources.dependsOn copyTestResources
+def additionalDockerFiles = copySpec {
+    from 'docker/app'
+    include '**/*'
 }
 
 docker {
     name "${baseDockerName}:${projectTag}"
     buildArgs([JAR_NAME: "${jarName}"])
-    files project.jar.outputs, baseDockerFile.getParentFile().listFiles(), buildDir.listFiles()
+    buildArgs([HOST_ADDRESS: "${HOST_ADDRESS}"])
+    copySpec.with(additionalDockerFiles)
+    files shadowJar.outputs.files, buildDir.listFiles()
     dockerfile baseDockerFile
 }
 
@@ -70,15 +59,61 @@ dockerRun {
     daemonize true
 }
 
+dockerCompose {
+    useComposeFiles = ["${project.projectDir}/docker/docker-compose.yml"]
+    if (System.getenv("CONFIG_PROFILE") == "dev") {
+        upAdditionalArgs = ["kafka"]
+    }
+    captureContainersOutput = true
+    forceRecreate = true
+    removeContainers = true
+    environment["DOCKER_IMAGE"] = project.docker.name
+    environment["HOST_ADDRESS"] = "${HOST_ADDRESS}"
+    environment["JAR_NAME"] = "${jarName}"
+}
+
 // Task Dependencies
 tasks.docker.dependsOn(shadowJar)
 tasks.dockerRun.dependsOn(tasks.docker)
+tasks.composeUp.dependsOn(tasks.docker)
+tasks.test.dependsOn(composeUp)
 shadowJar.dependsOn(compileKotlin, compileJava)
 
-// Dependencies
+// Dependencies //TODO: versions
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    compile("io.ktor:ktor-server-netty:1.2.2")
-    compile("ch.qos.logback:logback-classic:1.2.3")
-    testCompile("junit:junit:4.12")
+    compile "io.ktor:ktor-server-netty:1.2.2"
+    compile "io.ktor:ktor-jackson:1.2.2"
+    compile "ch.qos.logback:logback-classic:1.2.3"
+    compile "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.9.4"
+    compile "com.fasterxml.jackson.module:jackson-module-kotlin:2.9.4"
+    compile "com.fasterxml.jackson.core:jackson-core:2.9.4"
+    compile "com.fasterxml.jackson.core:jackson-databind:2.9.4"
+    compile "com.google.inject:guice:4.1.0"
+    compile "org.apache.kafka:kafka-clients:2.3.0"
+    compile "com.typesafe:config:1.3.4"
+    compile "commons-validator:commons-validator:1.6"
+    // test
+    testCompile "io.kotlintest:kotlintest:2.0.7"
+    testCompile "io.rest-assured:rest-assured:3.0.6"
+    testCompile "junit:junit:4.12"
+    testCompile "com.github.javafaker:javafaker:0.18"
+}
+
+def getLocalIPv4() {
+    def ip4s = []
+    NetworkInterface.getNetworkInterfaces()
+            .findAll { it.isUp() && !it.isLoopback() && !it.isVirtual() }
+            .each {
+        it.getInetAddresses()
+                .findAll { !it.isLoopbackAddress() && it instanceof Inet4Address }
+                .each { ip4s << it }
+    }
+    return ip4s.get(0).toString().substring(1)
+}
+
+task hostAddress {
+    doLast {
+        println getLocalIPv4()
+    }
 }

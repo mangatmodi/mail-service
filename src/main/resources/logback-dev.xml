@@ -1,0 +1,18 @@
+<configuration
+        xmlns="http://ch.qos.logback/xml/ns/logback"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://ch.qos.logback/xml/ns/logback https://raw.githubusercontent.com/applift/logback-XSD/master/src/main/xsd/logback.xsd">
+
+    <appender name="MAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%-10thread] [%X{X-Request-ID}] %-5level %-36logger{36}:%-4L %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <include resource="logback-levels.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="MAIN"/>
+    </root>
+
+</configuration>

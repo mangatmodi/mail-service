@@ -1,0 +1,95 @@
+openapi: 3.0.0
+
+info:
+  version: v1
+  title: Mail API
+  description: API to send asynchronous emails
+
+paths:
+  /mail:
+    put:
+      summary: Send a given mail
+      requestBody:
+        description: Mail request has a body as json
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MailInput'
+      responses:
+        200:
+          description: The mail reqest has been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailOutput'
+        400:
+          description: Bad request body format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestError'
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        200:
+          description: API server is live
+  /doc:
+    get:
+      summary: Returns this swagger doc
+      responses:
+        200:
+          description: Returns this swagger doc
+          content:
+            text/plain:
+              example: This document itself
+components:
+  schemas:
+    MailInput:
+      required:
+      - from
+      - to
+      - subject
+      - content
+      properties:
+        from:
+          type: string
+          format: email
+        to:
+          $ref: '#/components/schemas/EmailIds'
+        cc:
+          $ref: '#/components/schemas/EmailIds'
+        bcc:
+          $ref: '#/components/schemas/EmailIds'
+        subject:
+          type: string
+        content:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+            format: uri
+    MailOutput:
+      allOf:
+      - type: object
+        required:
+        - request_id
+        properties:
+          id:
+            type: string
+            format: uuid
+      - $ref: '#/components/schemas/MailInput'
+
+    EmailIds:
+      type: array
+      items:
+        type: string
+        format: email
+    RequestError:
+      required:
+      - message
+      properties:
+        message:
+          type: string
