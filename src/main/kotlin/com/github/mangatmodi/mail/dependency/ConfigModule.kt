@@ -20,6 +20,7 @@ class ConfigModule : AbstractModule() {
         )
 
         bind(ApplicationConfig.Kafka::class.java).toInstance(service.kafka)
+        bind(ApplicationConfig.SendMailService::class.java).toInstance(service.sendMailService)
         bind(ApplicationConfig.Deployment::class.java).toInstance(deployment)
     }
 }

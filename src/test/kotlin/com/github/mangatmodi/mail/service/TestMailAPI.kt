@@ -2,9 +2,10 @@ package com.github.mangatmodi.mail.service
 
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.github.mangatmodi.mail.common.EventName
-import com.github.mangatmodi.mail.common.KafkaRecord
+import com.github.mangatmodi.mail.common.KafkaRecordInitial
 import com.github.mangatmodi.mail.common.MailRequest
 import com.github.mangatmodi.mail.common.MailResponse
+import com.github.mangatmodi.mail.service.Fixture.fakeEmail
 import com.github.mangatmodi.mail.service.Fixture.objectMapper
 import com.github.mangatmodi.mail.service.Fixture.sendRequest
 import com.github.mangatmodi.mail.service.Fixture.testRecordFromTopic
@@ -22,12 +23,14 @@ class TestMailAPI : ShouldSpec() {
                         from = fakeEmail(),
                         to = listOf(fakeEmail(), fakeEmail()),
                         subject = "Test Mail",
-                        content = "Test Mail"
+                        content = "Test Mail",
+                        attachments = listOf("http://msldmlwe")
                     )
                     sendRequest(mail).statusCode shouldBe 202
                     testRecordFromTopic {
-                        with(objectMapper.readValue<KafkaRecord<MailResponse>>(it)) {
-                            this.entity.requestId shouldNotBe null
+                        with(objectMapper.readValue<KafkaRecordInitial<MailResponse>>(it)) {
+                            this.entity.id shouldNotBe null
+                            this.requestId shouldNotBe null
                             this.entity.toMailRequest() shouldBe mail
                             this.eventName shouldBe EventName.MAIL_CREATED.value
                         }
@@ -52,6 +55,4 @@ class TestMailAPI : ShouldSpec() {
             }
         }
     }
-
-    private fun fakeEmail() = "${Fixture.faker.name().username()}@${Fixture.faker.name().username()}.com"
 }

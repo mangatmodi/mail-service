@@ -8,12 +8,25 @@ object ApplicationConfig {
         var topic: String? = null
     )
 
-    data class Kafka(
-        var bootstrapServers: List<String>? = null,
-        var producer: KafkaProducer? = null
+    data class KafkaConsumer(
+        var groupId: String? = null,
+        var topic: List<String>? = null
     )
 
-    data class Service(var kafka: Kafka? = null)
+    data class Kafka(
+        var bootstrapServers: List<String>? = null,
+        var producer: KafkaProducer? = null,
+        var consumer: KafkaConsumer? = null
+    )
+
+    data class Service(
+        var kafka: Kafka? = null,
+        var sendMailService: SendMailService? = null
+    )
+
+    data class Smtp(var host: String? = null, var port: Int? = null)
+
+    data class SendMailService(var smtp: Smtp? = null, var connectionPoolSize: Int? = null, var retry: Int? = null)
 
     data class Deployment(var port: Int? = null)
 }
