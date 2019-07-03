@@ -1,4 +1,4 @@
-package com.github.mangatmodi.mail.service
+package com.github.mangatmodi.mail.service.api
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.mangatmodi.mail.common.*
@@ -29,8 +29,8 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.slf4j.MDC
 import java.util.*
+import java.util.concurrent.TimeUnit
 
-internal const val REQUEST_HEADER = "X-Request-ID"
 internal const val SWAGGER_FILE_NAME = "swagger.yml"
 
 class MailApiService @Inject constructor(
@@ -41,13 +41,13 @@ class MailApiService @Inject constructor(
 ) {
     private val logger = logger()
     fun start() {
-        embeddedServer(Netty, port = deployment.port!!) {
+        val server = embeddedServer(Netty, port = deployment.port!!) {
             install(CallLogging) {
-                callIdMdc(REQUEST_HEADER)
+                callIdMdc(this@MailApiService.logger.REQUEST_KEY)
             }
             install(CallId) {
                 generate {
-                    it.request.header(REQUEST_HEADER) ?: UUID.randomUUID().toString()
+                    it.request.header(logger.REQUEST_KEY) ?: UUID.randomUUID().toString()
                 }
             }
             install(ContentNegotiation) {
@@ -55,7 +55,7 @@ class MailApiService @Inject constructor(
                 routing {
                     post("/mail") {
                         val input = call.receive<MailRequest>()
-                        logger.info("Request received to send mail ${MDC.get(REQUEST_HEADER)}:")
+                        logger.info("Request received to send mail ${MDC.get(logger.REQUEST_KEY)}:")
                         if (!MailRequestValidation.validate(input)) {
                             logger.warn("Invalid data format in the request $input:")
                             call.respond(
@@ -64,14 +64,14 @@ class MailApiService @Inject constructor(
                             )
                             this.finish()
                         } else {
-                            val response = input.toMailResponse(MDC.get(REQUEST_HEADER))
+                            val response = input.toMailResponse(UUID.randomUUID())
                             call.respond(HttpStatusCode.Accepted, response)
                             launch {
                                 val record = ProducerRecord(
                                     kafkaConfig.producer!!.topic!!,
-                                    UUID.randomUUID().toString(),
+                                    UUID.randomUUID().toString(), // random key
                                     objectMapper.writeValueAsString(
-                                        KafkaRecord(EventName.MAIL_CREATED.value, response)
+                                        KafkaRecordInitial(response, MDC.get(logger.REQUEST_KEY).toUUID())
                                     )
                                 )
                                 kafkaProducer.send(record) { _, exception ->
@@ -95,6 +95,10 @@ class MailApiService @Inject constructor(
                 }
             }
         }.start(wait = true)
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            server.stop(1, 5, TimeUnit.SECONDS)
+        })
     }
 
     private fun swaggerText(): String {
@@ -102,9 +106,8 @@ class MailApiService @Inject constructor(
             val url = Resources.getResource(SWAGGER_FILE_NAME)
             Resources.toString(url, Charsets.UTF_8) ?: "$SWAGGER_FILE_NAME not found in resources"
         } catch (e: Throwable) {
-            e.printStackTrace()
-            logger.warn("Unable to read swagger, because: ${e.message}")
-            "$SWAGGER_FILE_NAME not found in resources"
+            logger.warn("Unable to read $SWAGGER_FILE_NAME", e)
+            "Unable to read $SWAGGER_FILE_NAME"
         }
     }
 }

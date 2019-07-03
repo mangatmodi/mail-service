@@ -2,10 +2,10 @@ version: '2.1'
 
 services:
 
-  mail-service:
+  mail-api:
     image: ${DOCKER_IMAGE}
     command: >
-      ./start-app.sh
+      ./start-app.sh -s API
     ports:
     - "8080:8080"
     depends_on:
@@ -14,11 +14,31 @@ services:
     networks:
       skynet:
         aliases:
-        - "mail-service"
+        - "mail-api"
     environment:
       JAVA_OPTS: -Dlogback.configurationFile=logback-dev.xml
       HOST_ADDRESS: ${HOST_ADDRESS}
       JAR_NAME: ${JAR_NAME}
+      PORT: 8080
+
+  send-mail-service:
+    image: ${DOCKER_IMAGE}
+    command: >
+      ./start-app.sh -s SEND_MAIL
+    ports:
+    - "8081:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      skynet:
+        aliases:
+        - "send-mail-service"
+    environment:
+      JAVA_OPTS: -Dlogback.configurationFile=logback-dev.xml
+      HOST_ADDRESS: ${HOST_ADDRESS}
+      JAR_NAME: ${JAR_NAME}
+      PORT: 8081
 
   kafka:
     image: landoop/fast-data-dev:2.1.0
@@ -43,6 +63,12 @@ services:
         sleep 20
       interval: 3s
       timeout: 25s
+
+  fakesmtp:
+    image: reachfive/fake-smtp-server:latest
+    ports:
+    - "1025:1025"
+    - "1080:1080"
 
 networks:
   skynet:
