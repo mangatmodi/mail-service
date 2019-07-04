@@ -53,41 +53,41 @@ After development is done, complete end to end tests can be done as
 Gradle provides enough power required for building the package and is among most popular build system in Java world.
 
 #### Packaging System
-The project is packed into a fat-jar which includes all the non jdk dependency. This jar is further packed into `OpenJDK:11-slim` based docker image. 
+The project is packed into a fat-jar which includes all the non jdk dependencies. This jar is further packed into `OpenJDK:11-slim` based docker image. 
 
 #### Programming Language/Platform
-JVM platform and Kotlin was selected simply for my familiarity and preference. The code is compiled to `JDK8` to have wider reach as higher versions are still not widely accepted. However it is run at `JRE-11` due to major improvements in JVM and GC.
+JVM platform and Kotlin was selected simply for my familiarity and preference. The code is compiled to `JDK8` bytecode to have wider reach as higher versions are still not widely adopted. However it is being run at `JRE-11` due to major improvements in JVM and GC.
 
 #### Config System
-HOCON config is selected due to it being *typesafe* and more *powerful* than more common plain yaml and json based configs. HOCON also uses environment variables. Thus many of the properties can be configured at the site by just changing environment variables at the platform.  
+HOCON config is selected due to it being *typesafe* and more *powerful* than plain yaml and json based configs. HOCON also uses environment variables. Thus many of the properties can be configured at the site by just changing the environment variables platform.  
 
 #### Web Server Framework
-KTor is extremely lightweight framework for writing micro services. Supports *Netty* for NIO and is very easy to configure. It is based on Kotlin coroutines.
+KTor is an extremely lightweight framework for writing micro services. Supports *Netty* for NIO and is very easy to configure. It is based on Kotlin coroutines.
 
 #### RxJava/2
-RxJava/2 implements observer pattern and provides a monadic-like api to easily compose functions(chaining!) and do error handling. It itself is un-opinionated on multithreading and provides utils to the developers to configure concurrency.
+RxJava/2 implements observer pattern and provides a monadic-like api to easily compose functions(chaining!) and do error handling. It is un-opinionated on multithreading and provides utilities to the developers to configure concurrency.
 
 #### Vert.x 
-Vert.x is another very popular microservice framework based on event-loop model. Where it contains `2 x #cpu-cores`. However here only Kafka and SMTP clients from vert.x are used. Because Ktor though lagging in features provides simpler API.
+Vert.x is another very popular microservice framework based on the event-loop model. Where it contains `2 x #cpu-cores` event loops. However we here use only Kafka and SMTP clients from vert.x, because Ktor though lagging in features, provides simpler API.
 
 #### Dependency Injection
-Guice is feature packed DI framework, making it easy provide dependencies.   
+Guice is a feature packed DI framework, making it easy to provide dependencies.   
 
 ### Salient Features
 
-- Coding Style: I tried to keep coding type safe, where maximum issues could be found at the compile time, and used sealed classes(Algebraic Data Type:Sum) and other properties in Kotlin to ensure exhaustiveness. Exhaustiveness makes it easier to reason about code and avoid bugs by forcing the developer to handle all the branches.
-- Distributed Log Tracing: Added a rudimentary example on how trace logs across services. Send an API request with `X-Request-ID` you could actually see logs logging in both the services with same ID.
-- Send Mail Service uses RxChain for executing the logic, but uses custom IO thread pool, with back pressure. This prevents blocking event-loop (reading from kafka), but also adds back-pressure to kafka consumer to avoid OOM or too many threads which is the case with the default schedulers in Rx library.
-- `/health` endpoint is exposed un each service.
-- Docker images are tagged with commit id.             
+- Coding Style: I tried to keep coding type safe, where many issues could be found at the compile time, and used sealed classes(Algebraic Data Type:Sum) and other properties in Kotlin to ensure exhaustiveness. Exhaustiveness makes it easier to reason about code and force the developer to handle all the branches.
+- Distributed Log Tracing: Added a rudimentary example on how to trace logs across services. Send an API request with `X-Request-ID` set in the header, you could actually see logs logging in both the services with the same ID.
+- Send Mail Service uses RxChain for executing the logic, but uses a custom IO thread pool, with back pressure. This prevents blocking the event-loop (reading from kafka), but also adds back-pressure to kafka consumer to avoid OOM or creating too many threads/tasks which is the case with the default schedulers in Rx library.
+- `/health` endpoint is exposed on each service.
+- Docker images are tagged with the commit id.             
 
 ### Required Improvements  
 The project was highly limited as a POC and several things can be improved. Following things come to the mind before similar could be attempted for production.
 1. MDC is by no means a good solution for request tracing. It is thread-local and we could have thread switches while serving a request.  
-2. The Mail API is not REST compliant as we are not creating any resource. We shall actually add a persistence at the backend and job status shall be exposed and updated via an API. 
-3. The use of expected exceptions should be avoided. Either pattern could be used to capture errors and provides exhaustiveness
-4. HOCON is hard to configure when every property needs to managed at the platform. For that Consul or ConfigMap might be a better choice.
-5. Metrics should be collected may be with Micrometer. They should exported, either by specifying or writing them into another system like statsd, from where they could be exported into prometheus or infludb 
+2. The Mail API is not REST compliant as we are not creating any resource. We shall actually add a persistence at the backend and the job status shall be exposed and updated via an API. 
+3. The use of known exceptions should be avoided. `Either` pattern could be used to capture errors and provide exhaustiveness
+4. HOCON is hard to configure when every property needs to managed at the site. For that Consul or ConfigMap might be a better choice.
+5. Metrics should be collected, may be with Micrometer. They should be exported, either by exposing an endpoint or writing them into another system like statsd, from where they could be exported into prometheus or influxdb 
 6. A UI for swagger could be exported.
-7. Overall code quality could still be improved. Due to time constraints I have cut some corners like forced change from nullable to non nullable types etc.  
+7. Overall code quality could still be improved. Due to time constraints I have cut some corners like forced change from nullable to non-nullable types etc.  
     
